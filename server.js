@@ -8,7 +8,7 @@ let emailsInMemory = [];
 
 // Secret key for scheduler authentication
 const SCHEDULER_SECRET =
-  process.env.SCHEDULER_SECRET || "your-secret-key-change-in-production";
+  process.env.SCHEDULER_SECRET || "hiwqowooeorrororo12435";
 
 // Middleware to parse JSON
 app.use(express.json());

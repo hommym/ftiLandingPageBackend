@@ -5,7 +5,7 @@ const https = require("https");
 // Configuration
 const API_ENDPOINT = "https://ftilandingpagebackend.onrender.com/api/emails";
 const SCHEDULER_SECRET =
-  process.env.SCHEDULER_SECRET || "your-secret-key-change-in-production";
+  process.env.SCHEDULER_SECRET || "hiwqowooeorrororo12435";
 const BACKUP_DIR = path.join(__dirname, "email-backups");
 
 /**
