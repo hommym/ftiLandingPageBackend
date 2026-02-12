@@ -1,0 +1,5 @@
+node_modules/
+emails.json
+*.log
+.env
+.DS_Store
