@@ -4,7 +4,9 @@ This guide explains how to use the automated backup system for your email submis
 
 ## Overview
 
-The backup system fetches emails from your deployed API and saves them to timestamped JSON files, creating a versioned history of all submissions.
+The backup system fetches emails from your deployed API and saves them to timestamped JSON files. Each backup **appends new emails to the most recent backup**, maintaining a complete cumulative history.
+
+**Important:** The backup scheduler **clears server memory** after retrieval, preventing data loss on Render's free tier.
 
 ## Files
 
@@ -13,7 +15,21 @@ The backup system fetches emails from your deployed API and saves them to timest
 
 ## Quick Start
 
-### 1. Run Backup Manually
+### 1. Set Up Environment
+
+First, configure your scheduler secret:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` and set the same secret key as your Render server:
+
+```
+SCHEDULER_SECRET=your-secret-key-from-render
+```
+
+### 2. Run Backup Manually
 
 ```bash
 node backup-emails.js
@@ -24,37 +40,47 @@ Output:
 ```
 🔄 Starting email backup...
 📡 Fetching from: https://ftilandingpagebackend.onrender.com/api/emails
-📧 Found 5 email(s)
-✅ Created backup directory: /path/to/email-backups
-✅ Backup saved: emails_2026-02-12_09-30-45.json
-📁 Full path: /path/to/email-backups/emails_2026-02-12_09-30-45.json
+📧 Retrieved 5 new email(s) from server
+🧹 Server memory cleared
+📎 Found previous backup: emails_2026-02-12_09-00-00.json (10 emails)
+✅ Backup saved: emails_2026-02-12_15-00-00.json
+   📊 New emails: 5
+   📊 Previous total: 10
+   📊 Current total: 15
+� Full path: /path/to/email-backups/emails_2026-02-12_15-00-00.json
 ✅ Backup completed successfully!
 ```
 
-### 2. View Backups
+### 3. View Backups
 
 All backups are saved in the `email-backups/` directory:
 
 ```
 email-backups/
-├── emails_2026-02-12_09-00-00.json
-├── emails_2026-02-12_15-30-45.json
-├── emails_2026-02-13_09-00-00.json
-└── emails_2026-02-14_09-00-00.json
+├── emails_2026-02-12_09-00-00.json   (10 emails)
+├── emails_2026-02-12_15-00-00.json   (15 emails - appended 5)
+├── emails_2026-02-13_09-00-00.json   (20 emails - appended 5)
+└── emails_2026-02-14_09-00-00.json   (25 emails - appended 5)
 ```
 
-Each file contains:
+Each file contains **cumulative data** plus metadata:
 
 ```json
 {
-  "count": 5,
+  "count": 15,
   "emails": [
     {
       "email": "user@example.com",
       "timestamp": "2026-02-12T08:30:00.000Z",
       "id": 1707730200123.456
     }
-  ]
+  ],
+  "metadata": {
+    "createdAt": "2026-02-12T15:00:00.000Z",
+    "previousBackup": "emails_2026-02-12_09-00-00.json",
+    "newEmailsAdded": 5,
+    "totalEmails": 15
+  }
 }
 ```
 

@@ -109,56 +109,41 @@ View all emails:
 curl http://localhost:3000/api/emails
 ```
 
-## Concurrency Handling
+## Data Storage Architecture
 
-**Question: Will bugs happen if two people submit emails at the same time?**
+### In-Memory Storage (Render Free Tier Solution)
 
-**Answer:** Without proper handling, **YES** - you could lose data due to race conditions. Here's why:
+**Problem:** Render free tier loses files when server idles/restarts.
 
-### The Problem:
-
-```
-Time 1: User A reads file → [email1, email2]
-Time 2: User B reads file → [email1, email2]
-Time 3: User A writes → [email1, email2, emailA]
-Time 4: User B writes → [email1, email2, emailB]  ❌ emailA is lost!
-```
-
-### The Solution:
-
-This project implements a **write queue** using Promise chaining:
+**Solution:** Emails are stored **in memory** until retrieved by the backup scheduler.
 
 ```javascript
-let writeQueue = Promise.resolve();
-
-writeQueue = writeQueue.then(async () => {
-  // Read, modify, write operations happen here
-  // All operations are serialized
-});
+// Server stores emails in RAM (not files)
+let emailsInMemory = [];
 ```
 
-This ensures all write operations are executed **sequentially**, one at a time, preventing data loss:
+**How it works:**
 
+1. User submits email → Stored in RAM
+2. Scheduler runs every X minutes → Retrieves all emails
+3. Server clears memory after successful retrieval
+4. Scheduler appends to most recent backup file
+
+See [`MEMORY_SYSTEM.md`](MEMORY_SYSTEM.md) for complete details.
+
+### Scheduler Authentication
+
+Only the backup scheduler can clear server memory:
+
+```bash
+# Regular access (view only, doesn't clear)
+GET /api/emails
+
+# Scheduler access (retrieves AND clears memory)
+GET /api/emails?secret=YOUR_SECRET_KEY
 ```
-Time 1: User A queues write
-Time 2: User B queues write (waits for A)
-Time 3: User A completes → [email1, email2, emailA]
-Time 4: User B executes → [email1, email2, emailA, emailB] ✅ Both saved!
-```
 
-## Data Storage
-
-Emails are stored in `emails.json` in the project root directory:
-
-```json
-[
-  {
-    "email": "user@example.com",
-    "timestamp": "2026-02-12T08:30:00.000Z",
-    "id": 1707730200123.456
-  }
-]
-```
+**Important:** Set `SCHEDULER_SECRET` environment variable in Render dashboard!
 
 ## Production Considerations
 

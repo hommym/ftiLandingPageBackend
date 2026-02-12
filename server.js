@@ -1,57 +1,17 @@
 const express = require("express");
-const fs = require("fs").promises;
-const path = require("path");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const DATA_FILE = path.join(__dirname, "emails.json");
+
+// In-memory storage for emails (persists until retrieved by scheduler)
+let emailsInMemory = [];
+
+// Secret key for scheduler authentication
+const SCHEDULER_SECRET =
+  process.env.SCHEDULER_SECRET || "your-secret-key-change-in-production";
 
 // Middleware to parse JSON
 app.use(express.json());
-
-// Simple file-based queue to handle concurrent writes
-let writeQueue = Promise.resolve();
-
-/**
- * Thread-safe write to JSON file
- * This prevents race conditions when multiple requests write simultaneously
- */
-async function saveEmailSafely(email) {
-  // Chain the write operations to prevent concurrent access
-  writeQueue = writeQueue.then(async () => {
-    try {
-      let emails = [];
-
-      // Try to read existing file
-      try {
-        const data = await fs.readFile(DATA_FILE, "utf8");
-        emails = JSON.parse(data);
-      } catch (error) {
-        // File doesn't exist or is empty, start with empty array
-        if (error.code !== "ENOENT") {
-          console.error("Error reading file:", error);
-        }
-      }
-
-      // Add new email with timestamp
-      emails.push({
-        email: email,
-        timestamp: new Date().toISOString(),
-        id: Date.now() + Math.random(), // Simple unique ID
-      });
-
-      // Write back to file
-      await fs.writeFile(DATA_FILE, JSON.stringify(emails, null, 2));
-
-      return { success: true };
-    } catch (error) {
-      console.error("Error saving email:", error);
-      throw error;
-    }
-  });
-
-  return writeQueue;
-}
 
 // POST endpoint to submit email
 app.post("/api/submit-email", async (req, res) => {
@@ -73,8 +33,18 @@ app.post("/api/submit-email", async (req, res) => {
       });
     }
 
-    // Save email safely (handles concurrent writes)
-    await saveEmailSafely(email);
+    // Save email to in-memory storage
+    const emailEntry = {
+      email: email,
+      timestamp: new Date().toISOString(),
+      id: Date.now() + Math.random(), // Simple unique ID
+    };
+
+    emailsInMemory.push(emailEntry);
+
+    console.log(
+      `📧 Email stored in memory: ${email} (Total: ${emailsInMemory.length})`,
+    );
 
     res.status(201).json({
       message: "Email submitted successfully",
@@ -88,36 +58,55 @@ app.post("/api/submit-email", async (req, res) => {
   }
 });
 
-// GET endpoint to view all emails (for testing purposes)
+// GET endpoint for scheduler to retrieve and clear emails
 app.get("/api/emails", async (req, res) => {
   try {
-    const data = await fs.readFile(DATA_FILE, "utf8");
-    const emails = JSON.parse(data);
-    res.json({
-      count: emails.length,
-      emails: emails,
-    });
-  } catch (error) {
-    if (error.code === "ENOENT") {
+    const { secret } = req.query;
+
+    // Check if request is from scheduler (has secret key)
+    const isScheduler = secret === SCHEDULER_SECRET;
+
+    if (isScheduler) {
+      // Scheduler request: return data and clear memory
+      const emailsToReturn = [...emailsInMemory]; // Copy current data
+      const count = emailsToReturn.length;
+
+      emailsInMemory = []; // Clear memory
+
+      console.log(`🔄 Scheduler retrieved ${count} email(s) - Memory cleared`);
+
       res.json({
-        count: 0,
-        emails: [],
+        count: count,
+        emails: emailsToReturn,
+        cleared: true,
       });
     } else {
-      res.status(500).json({
-        error: "Failed to retrieve emails",
+      // Regular request: return data without clearing
+      res.json({
+        count: emailsInMemory.length,
+        emails: emailsInMemory,
+        cleared: false,
       });
     }
+  } catch (error) {
+    console.error("Error retrieving emails:", error);
+    res.status(500).json({
+      error: "Failed to retrieve emails",
+    });
   }
 });
 
 // Health check endpoint
 app.get("/health", (req, res) => {
-  res.json({ status: "OK" });
+  res.json({
+    status: "OK",
+    emailsInMemory: emailsInMemory.length,
+  });
 });
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Submit email: POST http://localhost:${PORT}/api/submit-email`);
   console.log(`View emails: GET http://localhost:${PORT}/api/emails`);
+  console.log(`Scheduler secret: ${SCHEDULER_SECRET}`);
 });
