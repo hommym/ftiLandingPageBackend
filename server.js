@@ -1,4 +1,5 @@
 const express = require("express");
+const cors = require("cors");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -10,7 +11,8 @@ let emailsInMemory = [];
 const SCHEDULER_SECRET =
   process.env.SCHEDULER_SECRET || "hiwqowooeorrororo12435";
 
-// Middleware to parse JSON
+// Middleware
+app.use(cors()); // Enable CORS for all routes
 app.use(express.json());
 
 // POST endpoint to submit email
