@@ -1,5 +1,6 @@
 const express = require("express");
 const cors = require("cors");
+const path = require("path");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -14,6 +15,9 @@ const SCHEDULER_SECRET =
 // Middleware
 app.use(cors()); // Enable CORS for all routes
 app.use(express.json());
+
+// Serve static files from the public folder
+app.use(express.static(path.join(__dirname, "public")));
 
 // POST endpoint to submit email
 app.post("/api/submit-email", async (req, res) => {
@@ -108,6 +112,7 @@ app.get("/health", (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  console.log(`Static files: http://localhost:${PORT}`);
   console.log(`Submit email: POST http://localhost:${PORT}/api/submit-email`);
   console.log(`View emails: GET http://localhost:${PORT}/api/emails`);
   console.log(`Scheduler secret: ${SCHEDULER_SECRET}`);
